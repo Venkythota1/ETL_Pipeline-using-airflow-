@@ -2,15 +2,15 @@
 Data Pipeline Using Airflow to Pull Amazon Data Engineering Books and Store in PostgreSQL
 
 
-🧩 Overview
+**🧩 Overview**
 
 This project demonstrates how to build a data pipeline using Apache Airflow to scrape Amazon Data Engineering books and store the results in a PostgreSQL database.
 
 All components are open-source and run locally using Docker containers.
 
-⚙️ Architecture
+**⚙️ Architecture**
 
-Tools Used:
+**Tools Used:**
 
 Apache Airflow → Workflow orchestration tool (scheduler)
 
@@ -20,24 +20,67 @@ pgAdmin → GUI for managing PostgreSQL
 
 Docker Compose → To manage and run all containers together
 
-🧠 Airflow Components
+
+Code to add in docker compose yaml file below services
+
+"""
+
+postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    ports:
+      - "5432:5432"
+
+pgadmin:
+
+    container_name: pgadmin4_container2
+    
+    image: dpage/pgadmin4
+    
+    restart: always
+    
+    environment:
+    
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+      
+    ports:
+      - "5050:80"
+"""
+
+
+
+
+**
+🧠 Airflow Components**
 Component	Description
-Scheduler	Schedules and triggers the execution of DAGs
-Webserver	Runs the Airflow UI for monitoring DAGs
+Scheduler	:Schedules and triggers the execution of DAGs
+Webserver :	Runs the Airflow UI for monitoring DAGs
 Metadata DB	Stores DAG runs, task status, and configuration data
-Executor	Executes the tasks defined in the DAG
+Executor :	Executes the tasks defined in the DAG
 
 A DAG (Directed Acyclic Graph) represents a workflow — a collection of tasks executed in a specific order.
 
 🐳 Setup: Airflow on Docker
 
 We use Docker Compose to run Airflow, PostgreSQL, and pgAdmin containers together.
-
-🔗 Reference
+**
+🔗 Reference**
 
 Official Airflow on Docker Documentation
 
-🧾 Steps
+**🧾 Steps**
 
 Install Airflow on Docker
 
@@ -92,7 +135,7 @@ Uses PostgresHook to connect to PostgreSQL.
 
 Inserts the data into the books table.
 
-🧠 Workflow Summary
+**🧠 Workflow Summary**
 Step	Task	Description
 1	scrape_books	Scrape book data from Amazon
 2	clean_books	Clean and deduplicate data
@@ -105,7 +148,9 @@ price	FLOAT	Price of the book
 rating	FLOAT	Average rating
 🧰 Airflow Connection Setup
 
-In the Airflow UI:
+
+
+**In the Airflow UI:**
 
 Navigate to Admin → Connections → +
 
