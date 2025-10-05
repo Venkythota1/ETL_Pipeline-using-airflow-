@@ -1,0 +1,99 @@
+I'll walk through the file app.py, explain what each part does, call out bugs/behavioral issues, and give a few practical recommendations you can apply immediately.
+
+What I'll cover
+
+High-level purpose
+Line-by-line / block explanation (functions, DAG, operators)
+Runtime behavior and data flow (XCom, DB interactions)
+Bugs and runtime pitfalls to fix
+Improvements and next steps you can apply quickly
+High-level purpose
+
+This is an Airflow DAG that implements a simple ETL:
+Extract: scrape Amazon search results for "data engineering books"
+Transform: build a pandas DataFrame and dedupe by title
+Load: insert the scraped book rows into a Postgres table
+It uses a PythonOperator to scrape, a SQL operator to create the table, and another PythonOperator to insert rows using a PostgresHook.
+File walkthrough and explanation
+
+Top-level imports and comments
+
+Imports datetime/timedelta, Airflow DAG and operator classes, requests, pandas, and BeautifulSoup.
+Comments at the top describe ETL, operators, and hooks.
+HTTP headers
+
+headers dict sets a Referer and a user-agent to make HTML requests to Amazon appear like a browser. This is used in the requests.get calls.
+get_amazon_data_books(num_books, **kwargs)
+
+Purpose: fetch num_books book entries from Amazon search results, build a list of dicts, put results into XCom.
+Uses kwargs['ti'] to access the Airflow TaskInstance (so it can xcom_push).
+It builds a base_url = "https://www.amazon.com/s?k=data+engineering+books" and iterates pages (page counter) until it collects num_books unique books.
+For each page it:
+requests the page with requests.get(url, headers=headers) and checks status code.
+parses HTML with BeautifulSoup, finds containers matching div with class "s-result-item".
+within each container tries to find title, author, price, rating from specific class names:
+title: span.a-text-normal
+author: a.a-size-base
+price: span.a-price-whole
+rating: span.a-icon-alt
+only when all four values are present it creates a record and appends it to books. It keeps a seen_titles set to avoid duplicates while scraping.
+After the loop, it trims the list to requested num_books, converts it to a pandas DataFrame, drops duplicates by Title, and pushes the DataFrame as list-of-records into XCom key 'book_data' via ti.xcom_push(key='book_data', value=df.to_dict('records')).
+insert_book_data_into_postgres(ti)
+
+Purpose: pull 'book_data' from XCom and insert rows into Postgres.
+It calls ti.xcom_pull(key='book_data', task_ids='fetch_book_data').
+If no data, raises ValueError.
+Creates a PostgresHook(postgres_conn_id='books_connection'). Then runs a simple INSERT query for each row: INSERT INTO books (title, authors, price, rating) VALUES (%s, %s, %s, %s)
+Uses postgres_hook.run(insert_query, parameters=(book['Title'], book['Author'], book['Price'], book['Rating'])).
+DAG/default_args
+
+default_args sets start date (Jan 1, 2023), retries and retry delay.
+DAG created as: dag = DAG('fetch_and_store_amazon_books', default_args=..., description=..., schedule=timedelta(days=1))
+This schedules the DAG once per day (though note later about schedule param name).
+Operators and tasks
+
+fetch_book_data_task — PythonOperator:
+task_id='fetch_book_data'
+python_callable=get_amazon_data_books
+op_kwargs={'num_books': 50}
+create_table_task — SQLExecuteQueryOperator:
+task_id='create_table'
+sql=create_table_sql (a CREATE TABLE IF NOT EXISTS statement)
+conn_id='Amazon_books_connection'
+insert_book_data_task — PythonOperator:
+task_id='insert_book_data'
+python_callable=insert_book_data_into_postgres
+Task order: fetch_book_data_task >> create_table_task >> insert_book_data_task
+fetch -> create -> insert (fetch runs first; create runs second; insert runs last)
+Data flow summary
+
+fetch_book_data_task scrapes and pushes book list to XCom under key 'book_data'.
+create_table_task ensures the books table exists.
+insert_book_data_task pulls XCom 'book_data' and inserts rows into Postgres using a hook.
+Important issues, bugs and runtime pitfalls
+
+Mismatched connection IDs (very likely runtime error)
+PostgresHook(postgres_conn_id='books_connection') in insert_book_data_into_postgres but create_table_task uses conn_id='Amazon_books_connection'.
+If both refer to the same Postgres server, the connection id must match. Either create two Airflow connections with those IDs, or change both to the same connection id. This mismatch will cause failures or write to different DBs.
+XCom size and pattern
+The code pushes the whole DataFrame (list of dicts) into XCom. XComs are not intended for large payloads and may be limited by your metadata DB's column size / XCom backend. For large lists, prefer:
+write scraped results to a staging table or file in shared storage (S3, GCS), then pass only a pointer via XCom.
+or directly insert into the DB from the fetch task.
+Scraping Amazon is fragile and potentially against their Terms
+Amazon pages are highly dynamic, and HTML structure and class names change frequently. The selectors used (s-result-item, a-text-normal, a-price-whole, etc.) may not match actual markup and will break.
+Amazon may block/ban requests, show CAPTCHAs, or require JS rendering. Consider using the Amazon Product Advertising API or a proper scraping service.
+Use rate limiting and error handling; do not hammer pages.
+BeautifulSoup selectors and falsy skipping
+The code requires all 4 fields present (title, author, price, rating); many valid product results may miss one (e.g., price is not shown for Kindle sample) and will be ignored. This can reduce results drastically.
+Task instance context passing (Airflow version compatibility)
+The fetch function uses ti = kwargs['ti']. That requires the Python callable to receive Airflow context. In Airflow 2.x, PythonOperator will pass context if the callable accepts **kwargs; it should work, but behavior depends on Airflow version. If you see KeyError for 'ti', use:
+from airflow.operators.python import get_current_context
+ctx = get_current_context(); ti = ctx['ti'] or change the function signature to accept task_instance explicitly depending on Airflow configuration.
+DAG schedule argument name
+The DAG is constructed with schedule=timedelta(days=1). Historically the parameter name was schedule_interval; recent Airflow versions accept schedule as an alias, but check your Airflow version. If the DAG doesn't schedule, change to schedule_interval='@daily' or schedule_interval=timedelta(days=1).
+Task ordering: fetch -> create -> insert
+Currently table creation runs after fetch. That is okay functionally, but if the fetch task produces lots of data and fails later because the table wasn't created (rare here), you might prefer create_table_task to run before fetching (create_table_task >> fetch_book_data_task >> insert_book_data_task) — small design choice.
+SQL injection / parameter mapping and column names
+The code uses parameterized queries with placeholders, which is good. But column names in the insert are title, authors, price, rating while the scraped record keys are 'Title' and 'Author' — those are mapped in the parameters correctly, but be mindful of consistent naming.
+Using prints instead of Airflow logging
+Replace print() with from airflow.utils.log.logging_mixin import LoggingMixin or use logging so logs show properly in Airflow UI and are structured
