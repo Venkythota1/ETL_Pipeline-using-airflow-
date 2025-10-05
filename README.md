@@ -1,68 +1,124 @@
-# Amazon Books ETL (Airflow DAG)
+**🧩 Overview**
 
-A small Airflow ETL that scrapes Amazon search results for "data engineering" books, cleans/deduplicates the results, and inserts them into a Postgres `books` table.
+This project demonstrates how to build a data pipeline using Apache Airflow to scrape Amazon Data Engineering books and store the results in a PostgreSQL database.
 
-This repository contains DAG code (under `dags/`), a `docker-compose.yaml` for local development, and minimal helpers to run the project locally.
+All components are open-source and run locally using Docker containers.
 
-## Repository layout
+**⚙️ Architecture**
 
-- `dags/` — Airflow DAGs and helpers (your `app.py` lives here)
-- `docker-compose.yaml` — local development stack (if present)
-- `config/` — Airflow configuration
-- `logs/` — Airflow task logs (ignored)
+Tools Used:
 
-## Quick setup (local)
+Apache Airflow → Workflow orchestration tool (scheduler)
 
-These steps assume Windows PowerShell (you can adapt them for other shells).
+PostgreSQL → Relational database for storing data
 
-1. Create a Python virtual environment and install deps
+pgAdmin → GUI for managing PostgreSQL
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+Docker Compose → To manage and run all containers together
 
-2. If you plan to run Airflow locally via `docker-compose` use the provided `docker-compose.yaml`. Make sure Docker Desktop is running.
+**🧠 Airflow Components**
+Component	Description
+Scheduler	Schedules and triggers the execution of DAGs
+Webserver	Runs the Airflow UI for monitoring DAGs
+Metadata DB	Stores DAG runs, task status, and configuration data
+Executor	Executes the tasks defined in the DAG
 
-3. Airflow connections and variables
+A DAG (Directed Acyclic Graph) represents a workflow — a collection of tasks executed in a specific order.
 
-- The DAG expects a Postgres connection. In Airflow UI create a connection (Admin → Connections) with:
-  - Conn Id: `Amazon_books_connection` (or `books_connection`, but keep it consistent with `dags/app.py`)
-  - Conn Type: Postgres
-  - Host / Schema / Login / Password / Port as appropriate.
+🐳 Setup: Airflow on Docker
 
-4. Adjust connection IDs in `dags/app.py` if you prefer a different name (search for `conn_id` and `postgres_conn_id`).
+We use Docker Compose to run Airflow, PostgreSQL, and pgAdmin containers together.
 
-## Run the DAG (manual)
+**🔗 Reference**
 
-- If using Airflow via Docker Compose: start the stack, open the Airflow UI, unpause the DAG `fetch_and_store_amazon_books`, and trigger a manual run.
-- If running Airflow locally (system install), ensure the DAGs folder is configured in `airflow.cfg` and restart the scheduler.
+Official Airflow on Docker Documentation
 
-## Notes about scraping and production concerns
+**🧾 Steps**
 
-- Scraping Amazon is fragile: HTML structure, selectors and anti-bot measures can change and break the DAG.
-- Consider using an API (Product Advertising API) or a scraping service for production.
-- Avoid storing large payloads in XCom; for larger datasets write results to a staging table or object storage and pass only a pointer via XCom.
-- Use idempotent inserts (Postgres `ON CONFLICT DO NOTHING`) or unique constraints to avoid duplicate rows on re-runs.
+Install Airflow on Docker
 
-```
+docker compose up airflow-init
+docker compose up
 
-## Recommended next steps (small checklist)
 
-- [ ] Ensure Airflow connection id(s) in `dags/app.py` match the connection configured in Airflow.
-- [ ] Replace prints with proper logging (`logging` module).
-- [ ] Make DB inserts idempotent with `ON CONFLICT` or add a unique constraint.
-- [ ] Move large payloads out of XCom and into object storage / staging table.
-- [ ] Add CI (optional): linting, unit tests, and basic syntax checks for DAGs.
+Install PostgreSQL and pgAdmin on Docker
+Both are included in the same docker-compose.yml file or can be added as separate services.
 
-## Troubleshooting
+Verify Running Containers
 
-- If the DAG doesn't appear in Airflow UI: ensure Airflow's `dags_folder` points to this repository's `dags/` path and the scheduler is running.
-- If DB inserts fail: verify the connection credentials and that the `books` table exists (the DAG includes a create table task).
+docker ps
+docker container ls
 
-## License
 
-This repository is provided under the MIT License — see `LICENSE`.
+Inspect PostgreSQL Container
+To connect from pgAdmin or Airflow:
 
+docker inspect <container_id>
+
+
+Copy the IP Address of the PostgreSQL container.
+
+Connect pgAdmin to PostgreSQL
+Use the container IP and port from the inspect command.
+
+Create Database
+In pgAdmin, create a new database named:
+
+amazon_books
+
+**📄 DAG Description**
+
+The Airflow DAG performs the following tasks:
+
+Extract
+
+Scrapes book data (title, author, price, and rating) from Amazon.
+
+Fetches top Data Engineering books.
+
+Transform
+
+Removes duplicates.
+
+Cleans and formats the data into a Pandas DataFrame.
+
+Load
+
+Uses PostgresHook to connect to PostgreSQL.
+
+Inserts the data into the books table.
+
+**🧠 Workflow Summary**
+Step	Task	Description
+1	scrape_books	Scrape book data from Amazon
+2	clean_books	Clean and deduplicate data
+3	load_to_postgres	Insert cleaned data into PostgreSQL using PostgresHook
+
+🗄️ Example Table Schema (books)
+Column	Type	Description
+title	TEXT	Book title
+author	TEXT	Book author
+price	FLOAT	Price of the book
+rating	FLOAT	Average rating
+
+🧰 Airflow Connection Setup
+
+In the Airflow UI:
+
+Navigate to Admin → Connections → +
+
+Create a new connection:
+
+Conn Id: postgres_conn
+
+Conn Type: Postgres
+
+Host: <PostgreSQL container IP>
+
+Schema: amazon_books
+
+Login: postgres
+
+Password: <your_password>
+
+Port: 5432
