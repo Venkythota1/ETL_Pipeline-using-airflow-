@@ -32,6 +32,7 @@ We use Docker Compose to run Airflow, PostgreSQL, and pgAdmin containers togethe
 **🔗 Reference**
 
 Official Airflow on Docker Documentation
+https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html
 
 **🧾 Steps**
 
@@ -122,3 +123,4 @@ Login: postgres
 Password: <your_password>
 
 Port: 5432
+
