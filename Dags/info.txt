@@ -1,0 +1,36 @@
+Data pipeline using Airflow to pull amazon DE books and store it in a RDBMS (Postgres)
+
+all tools are Open source and we can execute on local machine
+
+
+airflow : workflow orchestration tool (scheduler)
+is a platform that allows to manage and schedule complex workflows knows as DAGs (Directed acyclic graph) Dag represents a series of tasks that have to be executed in a specific order. in order to run these DAGs there are several internal components that are needed 
+			
+* scheduler : which allows scheduling of DAGs
+* Webserver : to run the Ui 
+* DB : to store the metadata
+* executors : in order to run these DAGs
+
+to manage all this internal components we will be installing AIRFLOW on a Docker container 
+
+AIRFLOW on Docker 
+https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html
+
+1 installed airflow on docker 
+2 installed postgres and pgadmin on the same docker
+commands : docker ps 
+		docker container ls 
+docker inspect <container Id>
+inorder to connect to DB on pgadmin we need container ID of postgres and from that we can checkout the IP address where postgress is running 
+and then on airflow connect to pgadmin we need connection name and hostname (IP address) and port
+3 creating DB of amazon books on pg admin
+4  Creating Dag
+
+code :
+will get amazon books data from website 
+remove duplicates and return it has DF 
+
+
+after fetching the books data we use the postgreshook inorder to insert the books data into the table
+
+using postgresshook we will be inserting ttitle, author, price and rating into the books table on postgress
