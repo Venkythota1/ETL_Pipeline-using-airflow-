@@ -47,28 +47,6 @@ pip install -r requirements.txt
 - Avoid storing large payloads in XCom; for larger datasets write results to a staging table or object storage and pass only a pointer via XCom.
 - Use idempotent inserts (Postgres `ON CONFLICT DO NOTHING`) or unique constraints to avoid duplicate rows on re-runs.
 
-## Git and GitHub — create the repo and push
-
-If you don't yet have a GitHub repository, you can create one via the website or `gh` CLI.
-
-Web: create a new repository on GitHub and copy the remote URL.
-
-Using Git and PowerShell locally (replace `<REMOTE_URL>`):
-
-```powershell
-cd C:\Users\venthota\WORKSPACE
-git init
-git add .
-git commit -m "chore: initial commit - add Airflow DAG and project files"
-git branch -M main
-git remote add origin <REMOTE_URL>
-git push -u origin main
-```
-
-Using GitHub CLI (if installed):
-
-```powershell
-gh repo create my-amazon-books-etl --public --source=. --remote=origin --push
 ```
 
 ## Recommended next steps (small checklist)
@@ -87,3 +65,4 @@ gh repo create my-amazon-books-etl --public --source=. --remote=origin --push
 ## License
 
 This repository is provided under the MIT License — see `LICENSE`.
+
