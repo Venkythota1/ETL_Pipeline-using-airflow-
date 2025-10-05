@@ -41,20 +41,13 @@ postgres:
     restart: always
     ports:
       - "5432:5432"
-
 pgadmin:
-
     container_name: pgadmin4_container2
-    
     image: dpage/pgadmin4
-    
     restart: always
-    
     environment:
-    
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: root
-      
     ports:
       - "5050:80"
 """
